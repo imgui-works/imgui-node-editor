@@ -13,9 +13,9 @@
 
 
 //------------------------------------------------------------------------------
+# include <imgui.h>
 # include <cstdint> // std::uintXX_t
 # include <utility> // std::move
-# include "imgui.h"
 
 
 //------------------------------------------------------------------------------
@@ -180,9 +180,9 @@ struct Style
         FlowSpeed               = 150.0f;
         FlowDuration            = 2.0f;
         PivotAlignment          = ImVec2(0.5f, 0.5f);
-        PivotSize               = ImVec2(-1, -1);
+        PivotSize               = ImVec2(0.0f, 0.0f);
         PivotScale              = ImVec2(1, 1);
-        PinCorners              = 15;
+        PinCorners              = ImDrawCornerFlags_All;
         PinRadius               = 0.0f;
         PinArrowSize            = 0.0f;
         PinArrowWidth           = 0.0f;

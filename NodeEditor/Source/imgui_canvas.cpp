@@ -94,6 +94,7 @@ bool ImGuiEx::Canvas::Begin(ImGuiID id, const ImVec2& size)
 # endif
 
     SaveInputState();
+    SaveViewportState();
 
     EnterLocalSpace();
 
@@ -319,6 +320,26 @@ void ImGuiEx::Canvas::RestoreInputState()
     ImGui::GetCurrentWindow()->DC.CursorMaxPos = m_WindowCursorMaxBackup;
 }
 
+void ImGuiEx::Canvas::SaveViewportState()
+{
+# if defined(IMGUI_HAS_VIEWPORT)
+    auto viewport = ImGui::GetWindowViewport();
+
+    m_ViewportPosBackup = viewport->Pos;
+    m_ViewportSizeBackup = viewport->Size;
+# endif
+}
+
+void ImGuiEx::Canvas::RestoreViewportState()
+{
+# if defined(IMGUI_HAS_VIEWPORT)
+    auto viewport = ImGui::GetWindowViewport();
+
+    viewport->Pos = m_ViewportPosBackup;
+    viewport->Size = m_ViewportSizeBackup;
+# endif
+}
+
 void ImGuiEx::Canvas::EnterLocalSpace()
 {
     // Prepare ImDrawList for drawing in local coordinate system:
@@ -355,10 +376,24 @@ void ImGuiEx::Canvas::EnterLocalSpace()
     m_Ranges.resize(m_Ranges.Size + 1);
     m_CurrentRange = &m_Ranges.back();
     m_CurrentRange->BeginComandIndex = ImMax(m_DrawList->CmdBuffer.Size - 1, 0);
-    m_CurrentRange->BeginVertexIndex = m_DrawList->_VtxCurrentIdx;
+    m_CurrentRange->BeginVertexIndex = m_DrawList->_VtxCurrentIdx + m_DrawList->_VtxCurrentOffset;
 # endif
     m_DrawListCommadBufferSize       = ImMax(m_DrawList->CmdBuffer.Size - 1, 0);
-    m_DrawListStartVertexIndex       = m_DrawList->_VtxCurrentIdx;
+    m_DrawListStartVertexIndex       = m_DrawList->_VtxCurrentIdx + m_DrawList->_VtxCurrentOffset;
+
+# if defined(IMGUI_HAS_VIEWPORT)
+    auto viewport_min = m_ViewportPosBackup;
+    auto viewport_max = m_ViewportPosBackup + m_ViewportSizeBackup;
+
+    viewport_min.x = (viewport_min.x - m_ViewTransformPosition.x) * m_View.InvScale;
+    viewport_min.y = (viewport_min.y - m_ViewTransformPosition.y) * m_View.InvScale;
+    viewport_max.x = (viewport_max.x - m_ViewTransformPosition.x) * m_View.InvScale;
+    viewport_max.y = (viewport_max.y - m_ViewTransformPosition.y) * m_View.InvScale;
+
+    auto viewport = ImGui::GetWindowViewport();
+    viewport->Pos  = viewport_min;
+    viewport->Size = viewport_max - viewport_min;
+# endif
 
     // Clip rectangle in parent canvas space and move it to local space.
     clipped_clip_rect.x = (clipped_clip_rect.x - m_ViewTransformPosition.x) * m_View.InvScale;
@@ -388,7 +423,7 @@ void ImGuiEx::Canvas::LeaveLocalSpace()
 # if IMGUI_EX_CANVAS_DEFERED()
     IM_ASSERT(m_CurrentRange != nullptr);
 
-    m_CurrentRange->EndVertexIndex  = m_DrawList->_VtxCurrentIdx;
+    m_CurrentRange->EndVertexIndex  = m_DrawList->_VtxCurrentIdx + m_DrawList->_VtxCurrentOffset;
     m_CurrentRange->EndCommandIndex = m_DrawList->CmdBuffer.size();
     if (m_CurrentRange->BeginVertexIndex == m_CurrentRange->EndVertexIndex)
     {
@@ -400,7 +435,7 @@ void ImGuiEx::Canvas::LeaveLocalSpace()
 
     // Move vertices to screen space.
     auto vertex    = m_DrawList->VtxBuffer.Data + m_DrawListStartVertexIndex;
-    auto vertexEnd = m_DrawList->VtxBuffer.Data + m_DrawList->_VtxCurrentIdx;
+    auto vertexEnd = m_DrawList->VtxBuffer.Data + m_DrawList->_VtxCurrentIdx + m_DrawList->_VtxCurrentOffset;
 
     // If canvas view is not scaled take a faster path.
     if (m_View.Scale != 1.0f)
@@ -449,4 +484,5 @@ void ImGuiEx::Canvas::LeaveLocalSpace()
     ImGui::PopClipRect();
 
     RestoreInputState();
+    RestoreViewportState();
 }
